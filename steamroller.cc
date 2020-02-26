@@ -1,18 +1,16 @@
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-#include <libxml/xmlerror.h>
-#include <libxml/xmlsave.h>
-
 #include <cstdio>
 #include <filesystem>
 
-static void XMLCDECL LIBXML_ATTR_FORMAT(2,3) ErrorHandler(void *ctx, const char *msg, ...)
+#include <libxml/parser.h>
+
+static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char* msg, ...)
 {
-	xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx;
+	xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
 	xmlParserInputPtr input = nullptr;
 	xmlParserInputPtr cur = nullptr;
 
-	if (ctxt) {
+	if (ctxt)
+	{
 		input = ctxt->input;
 		if (input && input->filename && (ctxt->inputNr > 1))
 		{
@@ -25,7 +23,7 @@ static void XMLCDECL LIBXML_ATTR_FORMAT(2,3) ErrorHandler(void *ctx, const char 
 	va_list args;
 	va_start(args, msg);
 
-	fprintf(stderr, "error: ");
+	fprintf(stderr, "warning-as-error: ");
 	vfprintf(stderr, msg, args);
 
 	va_end(args);
@@ -57,32 +55,13 @@ static xmlParserInputPtr LoggingEntityLoader(const char* url, const char* id, xm
 	return ret;
 }
 
-static void StripTree(xmlNodePtr node)
-{
-	while (node)
-	{
-		if (node->type == XML_COMMENT_NODE)
-		{
-			xmlNodePtr old = node;
-			node = node->next;
-			xmlUnlinkNode(old);
-			xmlFreeNode(old);
-		}
-		else
-		{
-			StripTree(node->children);
-			node = node->next;
-		}
-	}
-}
-
 int main(int argc, char* argv[])
 {
 	LIBXML_TEST_VERSION
 
 	if (argc != 3)
 	{
-		fprintf(stderr, "Usage: %s input output", argv[0]);
+		fprintf(stderr, "Usage: %s input output\n", argv[0]);
 		return 1;
 	}
 
@@ -90,8 +69,8 @@ int main(int argc, char* argv[])
 	xmlLineNumbersDefault(1);
 
 	xmlParserCtxtPtr parserCtxt = xmlNewParserCtxt();
-	// parserCtxt->sax->error = ErrorHandler;
 	parserCtxt->sax->warning = ErrorHandler;
+	parserCtxt->sax->comment = [](void*, const xmlChar*) {};
 	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, argv[1], "utf-8",
 		XML_PARSE_DTDLOAD | XML_PARSE_NOENT | XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
 	xmlFreeParserCtxt(parserCtxt);
@@ -109,8 +88,6 @@ int main(int argc, char* argv[])
 		xmlFreeDtd(dtd);
 	}
 
-	StripTree(xmlDocGetRootElement(doc));
-
 	FILE* fp = fopen(argv[2], "wb");
 	if (fp == nullptr)
 	{
@@ -121,6 +98,7 @@ int main(int argc, char* argv[])
 	fputs("<!-- STEAMROLLED -->\n", fp);
 	int ret = xmlDocFormatDump(fp, doc, 1);
 
+	xmlFreeDoc(doc);
 	xmlCleanupParser();
 	fclose(fp);
 
