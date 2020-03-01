@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include <libxml/parser.h>
+#include <libxml/xmlsave.h>
 
 static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char* msg, ...)
 {
@@ -11,6 +12,12 @@ static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char
 
 	if (ctxt)
 	{
+		if (ctxt->errNo == XML_NS_ERR_UNDEFINED_NAMESPACE)
+		{
+			// ignore these
+			return;
+		}
+
 		input = ctxt->input;
 		if (input && input->filename && (ctxt->inputNr > 1))
 		{
@@ -23,7 +30,7 @@ static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char
 	va_list args;
 	va_start(args, msg);
 
-	fprintf(stderr, "warning-as-error: ");
+	fprintf(stderr, "error: ");
 	vfprintf(stderr, msg, args);
 
 	va_end(args);
@@ -70,9 +77,30 @@ int main(int argc, char* argv[])
 
 	xmlParserCtxtPtr parserCtxt = xmlNewParserCtxt();
 	parserCtxt->sax->warning = ErrorHandler;
+	parserCtxt->sax->error = ErrorHandler;
 	parserCtxt->sax->comment = [](void*, const xmlChar*) {};
-	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, argv[1], "utf-8",
-		XML_PARSE_DTDLOAD | XML_PARSE_NOENT | XML_PARSE_NOBLANKS | XML_PARSE_NSCLEAN);
+	parserCtxt->sax->endElementNs = [](void* ctx, const xmlChar* localname, const xmlChar* prefix, const xmlChar* URI) {
+		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
+		if (!ctxt)
+		{
+			return;
+		}
+
+		// The XML_PARSE_NOBLANKS option doesn't appear to work on trailing
+		// whitespace for included entities, so this is a hack around that
+		xmlNodePtr cur = ctxt->node;
+		if (cur->children != cur->last && xmlIsBlankNode(cur->last))
+		{
+			cur = cur->last;
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+		}
+
+		xmlSAX2EndElementNs(ctx, localname, prefix, URI);
+	};
+
+	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, argv[1], nullptr,
+		XML_PARSE_DTDLOAD | XML_PARSE_NOBLANKS | XML_PARSE_NOENT | XML_PARSE_NSCLEAN);
 	xmlFreeParserCtxt(parserCtxt);
 
 	if (doc == nullptr)
@@ -88,19 +116,16 @@ int main(int argc, char* argv[])
 		xmlFreeDtd(dtd);
 	}
 
-	FILE* fp = fopen(argv[2], "wb");
-	if (fp == nullptr)
-	{
-		perror("failed to open output file");
-		return 1;
-	}
+	xmlNodePtr root = xmlDocGetRootElement(doc);
+	xmlNodePtr comment = xmlNewComment(BAD_CAST " STEAMROLLED ");
+	xmlAddPrevSibling(root, comment);
 
-	fputs("<!-- STEAMROLLED -->\n", fp);
-	int ret = xmlDocFormatDump(fp, doc, 1);
+	xmlSaveCtxtPtr saveCtxt = xmlSaveToFilename(argv[2], "utf-8", XML_SAVE_FORMAT);
+	int ret = xmlSaveDoc(saveCtxt, doc);
 
+	xmlSaveClose(saveCtxt);
 	xmlFreeDoc(doc);
 	xmlCleanupParser();
-	fclose(fp);
 
 	if (ret == -1)
 	{
