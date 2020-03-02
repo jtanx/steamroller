@@ -12,55 +12,42 @@ enum class NodeTag
 static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char* msg, ...)
 {
 	xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
-	xmlParserInputPtr input = nullptr;
-	xmlParserInputPtr cur = nullptr;
-
 	if (ctxt)
 	{
+		// ignore these
 		if (ctxt->errNo == XML_NS_ERR_UNDEFINED_NAMESPACE)
 		{
-			// ignore these
 			return;
 		}
-
-		input = ctxt->input;
-		if (input && input->filename && (ctxt->inputNr > 1))
-		{
-			cur = input;
-			input = ctxt->inputTab[ctxt->inputNr - 1];
-		}
-		xmlParserPrintFileInfo(input);
-	}
-
-	va_list args;
-	va_start(args, msg);
-
-	fprintf(stderr, "error: ");
-	vfprintf(stderr, msg, args);
-
-	va_end(args);
-
-	if (ctxt)
-	{
-		xmlParserPrintFileContext(input);
-		if (cur)
-		{
-			xmlParserPrintFileInfo(cur);
-			xmlGenericError(xmlGenericErrorContext, "\n");
-			xmlParserPrintFileContext(cur);
-		}
-		// Make it error out, not sure of a better way
 		ctxt->wellFormed = 0;
 	}
+
+	// workaround to xmlParserError not coming in a va_list variant
+	va_list args;
+	std::string ret;
+
+	va_start(args, msg);
+	int length = std::min(vsnprintf(nullptr, 0, msg, args), 65535);
+	va_end(args);
+
+	if (length > 0)
+	{
+		va_start(args, msg);
+		ret.resize(length + 1);
+		vsnprintf(&ret[0], length + 1, msg, args);
+		va_end(args);
+	}
+
+	xmlParserError(ctx, "%s", ret.c_str());
 }
 
 static xmlParserInputPtr LoggingEntityLoader(const char* url, const char* id, xmlParserCtxtPtr ctx)
 {
-	//static std::filesystem::path sPwd = std::filesystem::current_path();
 	xmlParserInputPtr ret = xmlNoNetExternalEntityLoader(url, id, ctx);
 	if (ret && url)
 	{
 		// could also do relative, just pick a standard
+		//static std::filesystem::path sPwd = std::filesystem::current_path();
 		//auto resolved = std::filesystem::relative(url, sPwd);
 		auto resolved = std::filesystem::canonical(url);
 		printf("Loaded: %s\n", resolved.c_str());
