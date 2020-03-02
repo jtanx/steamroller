@@ -1,0 +1,6 @@
+<ns1:Conn>http://localhost:1234</ns1:Conn>
+<SubRef>
+        <Refer>&r3;</Refer>
+
+        <Ref2>&r3;</Ref2>
+</SubRef>

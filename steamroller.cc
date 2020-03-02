@@ -4,6 +4,11 @@
 #include <libxml/parser.h>
 #include <libxml/xmlsave.h>
 
+enum class NodeTag
+{
+	HAS_REFS = 1
+};
+
 static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char* msg, ...)
 {
 	xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
@@ -51,10 +56,12 @@ static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char
 
 static xmlParserInputPtr LoggingEntityLoader(const char* url, const char* id, xmlParserCtxtPtr ctx)
 {
+	//static std::filesystem::path sPwd = std::filesystem::current_path();
 	xmlParserInputPtr ret = xmlNoNetExternalEntityLoader(url, id, ctx);
 	if (ret && url)
 	{
 		// could also do relative, just pick a standard
+		//auto resolved = std::filesystem::relative(url, sPwd);
 		auto resolved = std::filesystem::canonical(url);
 		printf("Loaded: %s\n", resolved.c_str());
 	}
@@ -79,23 +86,37 @@ int main(int argc, char* argv[])
 	parserCtxt->sax->warning = ErrorHandler;
 	parserCtxt->sax->error = ErrorHandler;
 	parserCtxt->sax->comment = [](void*, const xmlChar*) {};
-	parserCtxt->sax->endElementNs = [](void* ctx, const xmlChar* localname, const xmlChar* prefix, const xmlChar* URI) {
+	parserCtxt->sax->getEntity = [](void* ctx, const xmlChar* name) {
 		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
-		if (!ctxt)
+		if (ctxt && ctxt->node)
 		{
-			return;
+			ctxt->node->_private = reinterpret_cast<void*>(NodeTag::HAS_REFS);
 		}
-
-		// The XML_PARSE_NOBLANKS option doesn't appear to work on trailing
-		// whitespace for included entities, so this is a hack around that
-		xmlNodePtr cur = ctxt->node;
-		if (cur->children != cur->last && xmlIsBlankNode(cur->last))
+		return xmlSAX2GetEntity(ctx, name);
+	};
+	parserCtxt->sax->endElementNs = [](void* ctx, const xmlChar* localname, const xmlChar* prefix, const xmlChar* URI) {
+		// The XML_PARSE_NOBLANKS option doesn't work well on elements that
+		// include entity references, so this works around that
+		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
+		if (ctxt && ctxt->node->_private == reinterpret_cast<void*>(NodeTag::HAS_REFS) &&
+			ctxt->node->children != ctxt->node->last)
 		{
-			cur = cur->last;
-			xmlUnlinkNode(cur);
-			xmlFreeNode(cur);
+			xmlNodePtr cur = ctxt->node->children;
+			while (cur != nullptr)
+			{
+				if (xmlIsBlankNode(cur))
+				{
+					xmlNodePtr temp = cur;
+					cur = cur->next;
+					xmlUnlinkNode(temp);
+					xmlFreeNode(temp);
+				}
+				else
+				{
+					cur = cur->next;
+				}
+			}
 		}
-
 		xmlSAX2EndElementNs(ctx, localname, prefix, URI);
 	};
 

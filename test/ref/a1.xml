@@ -1,0 +1,32 @@
+<!DOCTYPE Config[
+<!ENTITY % r3 SYSTEM "sub1/refs.xml"> %r3;
+<!ENTITY ref1a SYSTEM "sub1/ref1a.xml">
+<!ENTITY ref1b SYSTEM "sub1/ref1b.xml">
+<!ENTITY ref2a SYSTEM "sub2/ref2a.xml">
+<!ENTITY ref2b SYSTEM "sub2/ref2b.xml">
+]>
+
+<Config xmlns:ns1="http://ns/ns1.xsd">
+
+    <Block1>
+        <Sub1><Host>abc  def  </Host><Port>1234</Port></Sub1>
+        <Blanks>   
+        
+        </Blanks> <!-- Some blanks -->
+        <Cdata><![CDATA[  some cdata  two spaces  ]]> </Cdata>
+    </Block1>
+
+    <Block2>
+        &ref1a;
+    </Block2>
+
+    <Block3>&ref1b;</Block3>
+
+    <Block4>
+        &ref2a;
+
+        <Option>&ref2b;</Option>
+    </Block4>
+
+</Config>
+

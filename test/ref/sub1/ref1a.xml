@@ -1,0 +1,5 @@
+<NestedConfigWithNoTrailingWhitespace>
+    <Data1>data1</Data1>
+    <Data2>data2</Data2>
+    <Data3><Data3a>data3a</Data3a><Data3b>data3b</Data3b></Data3>
+</NestedConfigWithNoTrailingWhitespace>

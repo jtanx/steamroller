@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- STEAMROLLED -->
+<Config xmlns:ns1="http://ns/ns1.xsd">
+  <Block1>
+    <Sub1>
+      <Host>abc  def  </Host>
+      <Port>1234</Port>
+    </Sub1>
+    <Blanks>   
+        
+        </Blanks>
+    <Cdata><![CDATA[  some cdata  two spaces  ]]></Cdata>
+  </Block1>
+  <Block2>
+    <NestedConfigWithNoTrailingWhitespace>
+      <Data1>data1</Data1>
+      <Data2>data2</Data2>
+      <Data3>
+        <Data3a>data3a</Data3a>
+        <Data3b>data3b</Data3b>
+      </Data3>
+    </NestedConfigWithNoTrailingWhitespace>
+  </Block2>
+  <Block3>
+    <NestedConfigWithTrailingWhitespace>
+      <Data1>
+        <Data1a>data1a</Data1a>
+        <Data1b>data1b</Data1b>
+      </Data1>
+    </NestedConfigWithTrailingWhitespace>
+  </Block3>
+  <Block4>
+    <SingleLine>
+      <a>a</a>
+      <b>b</b>
+    </SingleLine>
+    <Option>
+      <ns1:Conn>http://localhost:1234</ns1:Conn>
+      <SubRef>
+        <Refer>blah blah</Refer>
+        <Ref2>blah blah</Ref2>
+      </SubRef>
+    </Option>
+  </Block4>
+</Config>
