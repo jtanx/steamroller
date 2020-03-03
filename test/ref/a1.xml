@@ -28,5 +28,9 @@
         <Option>&ref2b;</Option>
     </Block4>
 
+    <Block5 xmlns="http://clean.xsd">
+        <NSCleanOptionWillRemoveThisNsDecl xmlns="http://clean.xsd">1234</NSCleanOptionWillRemoveThisNsDecl>
+    </Block5>
+
 </Config>
 

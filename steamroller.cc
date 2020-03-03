@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
 	xmlParserCtxtPtr parserCtxt = xmlNewParserCtxt();
 	parserCtxt->sax->warning = ErrorHandler;
 	parserCtxt->sax->error = ErrorHandler;
-	parserCtxt->sax->comment = [](void*, const xmlChar*) {};
+	parserCtxt->sax->comment = nullptr;
 	parserCtxt->sax->getEntity = [](void* ctx, const xmlChar* name) {
 		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
 		if (ctxt && ctxt->node)
@@ -84,9 +84,10 @@ int main(int argc, char* argv[])
 	parserCtxt->sax->endElementNs = [](void* ctx, const xmlChar* localname, const xmlChar* prefix, const xmlChar* URI) {
 		// The XML_PARSE_NOBLANKS option doesn't work well on elements that
 		// include entity references, so this works around that
+		// This also removes element content where the content is only blanks
 		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
-		if (ctxt && ctxt->node->_private == reinterpret_cast<void*>(NodeTag::HAS_REFS) &&
-			ctxt->node->children != ctxt->node->last)
+		if (ctxt && (ctxt->node->children == ctxt->node->last ||
+			ctxt->node->_private == reinterpret_cast<void*>(NodeTag::HAS_REFS)))
 		{
 			xmlNodePtr cur = ctxt->node->children;
 			while (cur != nullptr)
@@ -107,8 +108,9 @@ int main(int argc, char* argv[])
 		xmlSAX2EndElementNs(ctx, localname, prefix, URI);
 	};
 
+	// Could also enable XML_PARSE_NSCLEAN
 	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, argv[1], nullptr,
-		XML_PARSE_DTDLOAD | XML_PARSE_NOBLANKS | XML_PARSE_NOENT | XML_PARSE_NSCLEAN);
+		XML_PARSE_DTDLOAD | XML_PARSE_NOBLANKS | XML_PARSE_NOENT);
 	xmlFreeParserCtxt(parserCtxt);
 
 	if (doc == nullptr)

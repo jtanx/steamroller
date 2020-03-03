@@ -6,9 +6,7 @@
       <Host>abc  def  </Host>
       <Port>1234</Port>
     </Sub1>
-    <Blanks>   
-        
-        </Blanks>
+    <Blanks/>
     <Cdata><![CDATA[  some cdata  two spaces  ]]></Cdata>
   </Block1>
   <Block2>
@@ -42,4 +40,7 @@
       </SubRef>
     </Option>
   </Block4>
+  <Block5 xmlns="http://clean.xsd">
+    <NSCleanOptionWillRemoveThisNsDecl xmlns="http://clean.xsd">1234</NSCleanOptionWillRemoveThisNsDecl>
+  </Block5>
 </Config>
