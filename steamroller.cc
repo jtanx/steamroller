@@ -11,7 +11,7 @@ enum class NodeTag
 
 static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char* msg, ...)
 {
-	xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
+	auto ctxt = static_cast<xmlParserCtxtPtr>(ctx);
 	if (ctxt)
 	{
 		// ignore these
@@ -24,21 +24,19 @@ static void XMLCDECL LIBXML_ATTR_FORMAT(2, 3) ErrorHandler(void* ctx, const char
 
 	// workaround to xmlParserError not coming in a va_list variant
 	va_list args;
-	std::string ret;
+	char ret[4096];
 
 	va_start(args, msg);
-	int length = std::min(vsnprintf(nullptr, 0, msg, args), 65535);
+	int rv = vsnprintf(ret, sizeof(ret), msg, args);
 	va_end(args);
 
-	if (length > 0)
+	if (rv < 0)
 	{
-		va_start(args, msg);
-		ret.resize(length + 1);
-		vsnprintf(&ret[0], length + 1, msg, args);
-		va_end(args);
+		perror("formatting error failed");
+		ret[0] = '\0';
 	}
 
-	xmlParserError(ctx, "%s", ret.c_str());
+	xmlParserError(ctx, "%s", ret);
 }
 
 static xmlParserInputPtr LoggingEntityLoader(const char* url, const char* id, xmlParserCtxtPtr ctx)
@@ -46,11 +44,18 @@ static xmlParserInputPtr LoggingEntityLoader(const char* url, const char* id, xm
 	xmlParserInputPtr ret = xmlNoNetExternalEntityLoader(url, id, ctx);
 	if (ret && url)
 	{
-		// could also do relative, just pick a standard
-		//static std::filesystem::path sPwd = std::filesystem::current_path();
-		//auto resolved = std::filesystem::relative(url, sPwd);
-		auto resolved = std::filesystem::canonical(url);
-		printf("Loaded: %s\n", resolved.c_str());
+		try
+		{
+			// could also do relative, just pick a standard
+			//static std::filesystem::path sPwd = std::filesystem::current_path();
+			//auto resolved = std::filesystem::relative(url, sPwd);
+			auto resolved = std::filesystem::canonical(url);
+			printf("Loaded: %s\n", resolved.c_str());
+		}
+		catch (const std::exception& e)
+		{
+			ctx->sax->error(ctx, "Failed to resolve external entity '%s': %s\n", url, e.what());
+		}
 	}
 
 	return ret;
@@ -74,7 +79,7 @@ int main(int argc, char* argv[])
 	parserCtxt->sax->error = ErrorHandler;
 	parserCtxt->sax->comment = nullptr;
 	parserCtxt->sax->getEntity = [](void* ctx, const xmlChar* name) {
-		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
+		auto ctxt = static_cast<xmlParserCtxtPtr>(ctx);
 		if (ctxt && ctxt->node)
 		{
 			ctxt->node->_private = reinterpret_cast<void*>(NodeTag::HAS_REFS);
@@ -85,9 +90,9 @@ int main(int argc, char* argv[])
 		// The XML_PARSE_NOBLANKS option doesn't work well on elements that
 		// include entity references, so this works around that
 		// This also removes element content where the content is only blanks
-		xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr)ctx;
+		auto ctxt = static_cast<xmlParserCtxtPtr>(ctx);
 		if (ctxt && (ctxt->node->children == ctxt->node->last ||
-			ctxt->node->_private == reinterpret_cast<void*>(NodeTag::HAS_REFS)))
+						ctxt->node->_private == reinterpret_cast<void*>(NodeTag::HAS_REFS)))
 		{
 			xmlNodePtr cur = ctxt->node->children;
 			while (cur != nullptr)
@@ -122,7 +127,7 @@ int main(int argc, char* argv[])
 	xmlDtdPtr dtd = xmlGetIntSubset(doc);
 	if (dtd != nullptr)
 	{
-		xmlUnlinkNode((xmlNodePtr)dtd);
+		xmlUnlinkNode(reinterpret_cast<xmlNodePtr>(dtd));
 		xmlFreeDtd(dtd);
 	}
 
