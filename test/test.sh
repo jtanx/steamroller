@@ -2,5 +2,5 @@
 
 for f in ref/*.xml; do
 	echo $f
-	../steamroller $f result/$(basename $f)
+	../steamroller ' STEAMROLLED ' $f result/$(basename $f)
 done

@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 
 #include <libxml/parser.h>
@@ -65,13 +66,23 @@ int main(int argc, char* argv[])
 {
 	LIBXML_TEST_VERSION
 
-	if (argc != 3)
+	const char *comment, *input, *output;
+	bool quiet = argc == 5;
+
+	if (argc < 4 || argc > 5 || (argc == 5 && strcmp(argv[1], "--quiet")))
 	{
-		fprintf(stderr, "Usage: %s input output\n", argv[0]);
+		fprintf(stderr, "Usage: %s [--quiet] comment input output\n", argv[0]);
 		return 1;
 	}
-
-	xmlSetExternalEntityLoader(LoggingEntityLoader);
+	else if (quiet)
+	{
+		comment = argv[2], input = argv[3], output = argv[4];
+	}
+	else
+	{
+		comment = argv[1], input = argv[2], output = argv[3];
+		xmlSetExternalEntityLoader(LoggingEntityLoader);
+	}
 	xmlLineNumbersDefault(1);
 
 	xmlParserCtxtPtr parserCtxt = xmlNewParserCtxt();
@@ -114,13 +125,13 @@ int main(int argc, char* argv[])
 	};
 
 	// Could also enable XML_PARSE_NSCLEAN
-	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, argv[1], nullptr,
-		XML_PARSE_DTDLOAD | XML_PARSE_NOBLANKS | XML_PARSE_NOENT);
+	xmlDocPtr doc = xmlCtxtReadFile(parserCtxt, input, nullptr,
+		XML_PARSE_DTDLOAD | XML_PARSE_NONET | XML_PARSE_NOBLANKS | XML_PARSE_NOENT);
 	xmlFreeParserCtxt(parserCtxt);
 
 	if (doc == nullptr)
 	{
-		fprintf(stderr, "failed to parse: %s\n", argv[1]);
+		fprintf(stderr, "failed to parse: %s\n", input);
 		return 1;
 	}
 
@@ -132,10 +143,10 @@ int main(int argc, char* argv[])
 	}
 
 	xmlNodePtr root = xmlDocGetRootElement(doc);
-	xmlNodePtr comment = xmlNewComment(BAD_CAST " STEAMROLLED ");
-	xmlAddPrevSibling(root, comment);
+	xmlNodePtr commentNode = xmlNewComment(BAD_CAST comment);
+	xmlAddPrevSibling(root, commentNode);
 
-	xmlSaveCtxtPtr saveCtxt = xmlSaveToFilename(argv[2], "utf-8", XML_SAVE_FORMAT);
+	xmlSaveCtxtPtr saveCtxt = xmlSaveToFilename(output, "utf-8", XML_SAVE_FORMAT);
 	int ret = xmlSaveDoc(saveCtxt, doc);
 
 	xmlSaveClose(saveCtxt);
@@ -144,7 +155,7 @@ int main(int argc, char* argv[])
 
 	if (ret == -1)
 	{
-		fprintf(stderr, "failed to serialise xml to %s\n", argv[2]);
+		fprintf(stderr, "failed to serialise xml to %s\n", output);
 		return 1;
 	}
 
